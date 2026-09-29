@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SimplePractice Admin Console (Demo)</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --panel: #fff; --border: #e2e6ec; --text: #1f2933; --muted: #6b7785;
+    --brand: #0b6e6e; --brand-dark: #085757; --ok: #1e8e4e; --ok-bg: #e6f6ec;
+    --off: #b42318; --off-bg: #fdecea; --warn-bg: #fff7e0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  header { background: var(--brand); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header .title { font-weight: 600; font-size: 16px; }
+  header .title span { opacity: .75; font-weight: 400; margin-left: 8px; font-size: 13px; }
+  header .agent { font-size: 13px; opacity: .9; }
+  main { max-width: 1040px; margin: 24px auto; padding: 0 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 14px; }
+  .muted { color: var(--muted); }
+  form.search { display: flex; gap: 10px; margin-top: 14px; }
+  input[type=text], select { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  button { cursor: pointer; border: 1px solid transparent; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 500; }
+  .btn-primary { background: var(--brand); color: #fff; } .btn-primary:hover { background: var(--brand-dark); }
+  .btn-secondary { background: #fff; border-color: var(--border); color: var(--text); } .btn-secondary:hover { background: #f0f2f5; }
+  .btn-danger { background: #fff; border-color: #f1b5ae; color: var(--off); }
+  .btn-sm { padding: 5px 12px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; }
+  tr.clickable:hover { background: #f7fafb; cursor: pointer; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.on { background: var(--ok-bg); color: var(--ok); } .badge.off { background: var(--off-bg); color: var(--off); }
+  .badge.neutral { background: #eef1f5; color: #3e4c59; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 24px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .field div { font-weight: 500; }
+  .crumbs { margin-bottom: 14px; } .crumbs a { color: var(--brand); text-decoration: none; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1f2933; color: #fff; padding: 12px 18px; border-radius: 6px; display: none; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; }
+  .modal { background: #fff; border-radius: 8px; padding: 22px; width: 440px; }
+  .modal textarea { width: 100%; min-height: 70px; margin: 10px 0 16px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .log li { padding: 6px 0; border-bottom: 1px dashed var(--border); } .log { list-style: none; padding: 0; margin: 0; }
+  .empty { padding: 20px; text-align: center; color: var(--muted); }
+  .demo-banner { background: var(--warn-bg); border: 1px solid #f3dd9a; padding: 8px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">SimplePractice Admin Console <span>Internal Support Tools</span></div>
+  <div class="agent">Signed in as <strong>support.agent@simplepractice.com</strong></div>
+</header>
+
+<main id="app"></main>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" role="dialog" aria-labelledby="modal-title">
+    <h2 id="modal-title">Confirm change</h2>
+    <div id="modal-body"></div>
+    <label for="modal-reason" class="muted">Reason for change (optional)</label>
+    <textarea id="modal-reason" placeholder="e.g. Customer requested via support chat"></textarea>
+    <div class="actions">
+      <button class="btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- Mock data ---------- */
+const FEATURES = [
+  { key: "telehealth",         name: "Telehealth",               desc: "HIPAA-compliant video sessions" },
+  { key: "online_booking",     name: "Online Booking",           desc: "Clients can request appointments online" },
+  { key: "client_portal",      name: "Client Portal",            desc: "Secure portal for forms, documents and messaging" },
+  { key: "insurance_claims",   name: "Insurance Claims",         desc: "Electronic claim submission (837P)" },
+  { key: "autopay",            name: "Autopay",                  desc: "Automatic card charges after appointments" },
+  { key: "text_reminders",     name: "Text Reminders",           desc: "SMS appointment reminders" },
+  { key: "group_telehealth",   name: "Group Telehealth",         desc: "Multi-client video sessions" },
+  { key: "ai_note_taker",      name: "AI Note Taker (Beta)",     desc: "Auto-generated progress note drafts" },
+];
+
+const SEED = [
+  { id: "SP-10482", practice: "Harbor Light Counseling", owner: "Dr. Maya Chen", email: "maya.chen@harborlightcounseling.com", role: "Practice Owner", plan: "Plus", status: "Active", clinicians: 4, created: "2021-03-14",
+    flags: { telehealth: true, online_booking: true, client_portal: true, insurance_claims: true, autopay: false, text_reminders: true, group_telehealth: false, ai_note_taker: false } },
+  { id: "SP-20931", practice: "Evergreen Family Therapy", owner: "James Okafor, LMFT", email: "james@evergreenfamilytherapy.com", role: "Practice Owner", plan: "Essential", status: "Active", clinicians: 1, created: "2023-07-02",
+    flags: { telehealth: false, online_booking: true, client_portal: true, insurance_claims: false, autopay: false, text_reminders: false, group_telehealth: false, ai_note_taker: false } },
+  { id: "SP-33718", practice: "Mindful Path Psychology", owner: "Sarah Lindqvist, PsyD", email: "sarah@mindfulpathpsych.com", role: "Clinician", plan: "Plus", status: "Active", clinicians: 7, created: "2019-11-20",
+    flags: { telehealth: true, online_booking: false, client_portal: true, insurance_claims: true, autopay: true, text_reminders: true, group_telehealth: true, ai_note_taker: false } },
+  { id: "SP-41205", practice: "Coastal Wellness Collective", owner: "Priya Raman", email: "priya.raman@coastalwellness.co", role: "Biller", plan: "Plus", status: "Past Due", clinicians: 12, created: "2020-05-09",
+    flags: { telehealth: true, online_booking: true, client_portal: false, insurance_claims: true, autopay: true, text_reminders: true, group_telehealth: false, ai_note_taker: true } },
+  { id: "SP-58820", practice: "Northside Speech & OT", owner: "Daniel Reyes", email: "dreyes@northsidespeechot.com", role: "Practice Owner", plan: "Starter", status: "Trial", clinicians: 2, created: "2026-09-01",
+    flags: { telehealth: false, online_booking: false, client_portal: false, insurance_claims: false, autopay: false, text_reminders: false, group_telehealth: false, ai_note_taker: false } },
+];
+
+/* ---------- State (persists in browser; resettable) ---------- */
+const STORE_KEY = "sp_admin_demo_v1";
+let state;
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(STORE_KEY)); if (s && s.accounts) return s; } catch (e) {}
+  return { accounts: JSON.parse(JSON.stringify(SEED)), log: [] };
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+function resetData() { state = { accounts: JSON.parse(JSON.stringify(SEED)), log: [] }; save(); toast("Demo data reset"); route(); }
+state = load();
+
+/* ---------- Helpers ---------- */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const findAcct = (id) => state.accounts.find(a => a.id.toLowerCase() === id.toLowerCase());
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 2500); }
+function search(q) {
+  q = q.trim().toLowerCase(); if (!q) return state.accounts;
+  return state.accounts.filter(a => [a.id, a.practice, a.owner, a.email].some(v => v.toLowerCase().includes(q)));
+}
+
+/* ---------- Views ---------- */
+function banner() {
+  return `<div class="demo-banner"><span>Demo environment — mock data only.</span>
+    <button class="btn-secondary btn-sm" id="reset-data">Reset demo data</button></div>`;
+}
+
+function renderSearch(q = "") {
+  const results = search(q);
+  $("#app").innerHTML = `${banner()}
+  <div class="panel">
+    <h1>Account Lookup</h1>
+    <div class="muted">Search by account ID, practice name, owner name, or email.</div>
+    <form class="search" id="search-form">
+      <input type="text" id="search-input" name="q" aria-label="Search accounts" placeholder="e.g. SP-20931 or james@evergreenfamilytherapy.com" value="${esc(q)}" autofocus />
+      <button type="submit" class="btn-primary" id="search-button">Search</button>
+    </form>
+  </div>
+  <div class="panel">
+    <h2>Results <span class="muted">(${results.length})</span></h2>
+    ${results.length ? `<table id="results-table">
+      <thead><tr><th>Account ID</th><th>Practice</th><th>Owner</th><th>Email</th><th>Plan</th><th>Status</th><th></th></tr></thead>
+      <tbody>${results.map(a => `<tr class="clickable" data-id="${a.id}">
+        <td><strong>${a.id}</strong></td><td>${esc(a.practice)}</td><td>${esc(a.owner)}</td><td>${esc(a.email)}</td>
+        <td>${a.plan}</td><td><span class="badge neutral">${a.status}</span></td>
+        <td><button class="btn-secondary btn-sm view-btn" data-id="${a.id}">View account</button></td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">No accounts match “${esc(q)}”.</div>`}
+  </div>`;
+  $("#search-form").onsubmit = (e) => { e.preventDefault(); location.hash = "#/search?q=" + encodeURIComponent($("#search-input").value); };
+  document.querySelectorAll("tr.clickable").forEach(r => r.onclick = () => location.hash = "#/account/" + r.dataset.id);
+  $("#reset-data").onclick = resetData;
+}
+
+function renderAccount(id) {
+  const a = findAcct(id);
+  if (!a) { $("#app").innerHTML = `${banner()}<div class="panel"><div class="crumbs"><a href="#/">← Back to search</a></div><div class="empty">Account ${esc(id)} not found.</div></div>`; $("#reset-data").onclick = resetData; return; }
+  const logs = state.log.filter(l => l.id === a.id).slice().reverse();
+  $("#app").innerHTML = `${banner()}
+  <div class="crumbs"><a href="#/" id="back-link">← Back to search</a></div>
+  <div class="panel" id="account-details">
+    <h1>${esc(a.practice)}</h1>
+    <div class="muted" style="margin-bottom:16px">Account ${a.id}</div>
+    <div class="grid">
+      <div class="field"><label>Account ID</label><div id="acct-id">${a.id}</div></div>
+      <div class="field"><label>Account Owner</label><div id="acct-owner">${esc(a.owner)}</div></div>
+      <div class="field"><label>Email</label><div id="acct-email">${esc(a.email)}</div></div>
+      <div class="field"><label>User Role</label><div id="acct-role">${a.role}</div></div>
+      <div class="field"><label>Plan</label><div id="acct-plan">${a.plan}</div></div>
+      <div class="field"><label>Account Status</label><div id="acct-status">${a.status}</div></div>
+      <div class="field"><label>Clinicians</label><div>${a.clinicians}</div></div>
+      <div class="field"><label>Customer Since</label><div>${a.created}</div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Feature Flags</h2>
+    <table id="feature-flags-table">
+      <thead><tr><th>Feature</th><th>Flag key</th><th>Status</th><th style="text-align:right">Action</th></tr></thead>
+      <tbody>${FEATURES.map(f => { const on = a.flags[f.key]; return `
+        <tr data-feature="${f.key}">
+          <td><strong>${f.name}</strong><div class="muted">${f.desc}</div></td>
+          <td><code>${f.key}</code></td>
+          <td><span class="badge ${on ? "on" : "off"}" id="status-${f.key}">${on ? "Enabled" : "Disabled"}</span></td>
+          <td style="text-align:right">${on
+            ? `<button class="btn-danger btn-sm flag-btn" id="disable-${f.key}" data-key="${f.key}" data-to="false">Disable</button>`
+            : `<button class="btn-primary btn-sm flag-btn" id="enable-${f.key}" data-key="${f.key}" data-to="true">Enable</button>`}</td>
+        </tr>`; }).join("")}
+      </tbody></table>
+  </div>
+  <div class="panel">
+    <h2>Audit Log</h2>
+    ${logs.length ? `<ul class="log" id="audit-log">${logs.map(l => `<li><strong>${esc(l.feature)}</strong> ${l.to ? "enabled" : "disabled"} by ${esc(l.by)} · <span class="muted">${l.at}</span>${l.reason ? ` — “${esc(l.reason)}”` : ""}</li>`).join("")}</ul>`
+      : `<div class="muted" id="audit-log">No changes recorded for this account.</div>`}
+  </div>`;
+  document.querySelectorAll(".flag-btn").forEach(b => b.onclick = () => confirmChange(a, b.dataset.key, b.dataset.to === "true"));
+  $("#reset-data").onclick = resetData;
+}
+
+function confirmChange(a, key, to) {
+  const f = FEATURES.find(x => x.key === key);
+  $("#modal-title").textContent = `${to ? "Enable" : "Disable"} ${f.name}?`;
+  $("#modal-body").innerHTML = `This will ${to ? "enable" : "disable"} <strong>${f.name}</strong> for <strong>${esc(a.practice)}</strong> (${a.id}).`;
+  $("#modal-reason").value = "";
+  $("#modal-confirm").textContent = to ? "Enable feature" : "Disable feature";
+  $("#modal-bg").style.display = "flex";
+  $("#modal-cancel").onclick = () => $("#modal-bg").style.display = "none";
+  $("#modal-confirm").onclick = () => {
+    a.flags[key] = to;
+    state.log.push({ id: a.id, feature: f.name, to, by: "support.agent@simplepractice.com", at: new Date().toLocaleString(), reason: $("#modal-reason").value.trim() });
+    save();
+    $("#modal-bg").style.display = "none";
+    toast(`${f.name} ${to ? "enabled" : "disabled"} for ${a.id}`);
+    renderAccount(a.id);
+  };
+}
+
+/* ---------- Router ---------- */
+function route() {
+  const h = location.hash || "#/";
+  let m;
+  if ((m = h.match(/^#\/account\/(.+)$/))) return renderAccount(decodeURIComponent(m[1]));
+  if ((m = h.match(/^#\/search\?q=(.*)$/))) return renderSearch(decodeURIComponent(m[1]));
+  renderSearch();
+}
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>
